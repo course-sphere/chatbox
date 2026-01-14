@@ -36,10 +36,12 @@ namespace ChatRoom.Server.Services
                 {
                     TcpClient tcpClient = await _listener.AcceptTcpClientAsync();
 
-                    ClientHandler newClient = new ClientHandler(tcpClient);
+                    ClientHandler newClient = new ClientHandler(tcpClient, _logAction);
                     ConnectedClients.Add(newClient);
 
-                    _logAction?.Invoke($"Client connected! (IP: {tcpClient.Client.RemoteEndPoint})");
+                    _logAction?.Invoke($"Client connected! IP: {tcpClient.Client.RemoteEndPoint}");
+
+                    _ = newClient.StartReadingLoop();
                 }
             }
             catch (Exception ex)
