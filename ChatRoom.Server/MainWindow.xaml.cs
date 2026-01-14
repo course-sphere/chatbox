@@ -6,7 +6,7 @@ namespace ChatRoom.Server
 {
     public partial class MainWindow : Window
     {
-        private ServerListener _server; 
+        private ServerListener? _server; 
 
         public MainWindow()
         {

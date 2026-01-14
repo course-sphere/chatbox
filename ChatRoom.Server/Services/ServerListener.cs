@@ -8,7 +8,7 @@ namespace ChatRoom.Server.Services
 {
     public class ServerListener
     {
-        private TcpListener _listener;
+        private TcpListener? _listener;
         private bool _isRunning;
         private int _port;
 
