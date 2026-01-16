@@ -30,12 +30,14 @@ namespace ChatRoom.Client
             else
                 AddMessage("System", "Connection failed!", false);
         }
-
-        private void btnSend_Click(object sender, RoutedEventArgs e)
+        private async void btnSend_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtMessage.Text)) return;
-          
+
             AddMessage(_myUsername, txtMessage.Text, true);
+
+            await _chatService.SendMessageAsync(txtMessage.Text, _myUsername);
+
             txtMessage.Clear();
             txtMessage.Focus();
         }
