@@ -20,7 +20,13 @@
                 <Border x:Name="MessageBubble" Grid.Column="1" Padding="10" CornerRadius="10" MaxWidth="250" Margin="5">
                     <StackPanel>
                         <TextBlock x:Name="SenderName" Text="{Binding Sender}" FontSize="10" Foreground="Gray" Margin="0,0,0,2"/>
+
                         <TextBlock Text="{Binding Content}" TextWrapping="Wrap" FontSize="14"/>
+
+                        <Button x:Name="btnDownload" Content="⬇ Download" Margin="0,5,0,0" 
+                                Background="#4CAF50" Foreground="White" BorderThickness="0" Height="25" FontSize="12"
+                                Visibility="Collapsed" Click="btnDownload_Chat_Click" Tag="{Binding Content}"/>
+
                         <TextBlock Text="{Binding Time, StringFormat=HH:mm}" FontSize="9" Foreground="#888888" HorizontalAlignment="Right" Margin="0,5,0,0"/>
                     </StackPanel>
                 </Border>
@@ -75,7 +81,6 @@
                  ItemTemplate="{StaticResource MessageTemplate}" 
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  Padding="10">
-
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
