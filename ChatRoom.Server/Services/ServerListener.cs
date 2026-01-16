@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using ChatRoom.Core;
 
 namespace ChatRoom.Server.Services
 {
@@ -36,10 +37,12 @@ namespace ChatRoom.Server.Services
                 {
                     TcpClient tcpClient = await _listener.AcceptTcpClientAsync();
 
-                    ClientHandler newClient = new ClientHandler(tcpClient);
+                    ClientHandler newClient = new ClientHandler(tcpClient, _logAction, this);
                     ConnectedClients.Add(newClient);
 
-                    _logAction?.Invoke($"Client connected! (IP: {tcpClient.Client.RemoteEndPoint})");
+                    _logAction?.Invoke($"Client connected! IP: {tcpClient.Client.RemoteEndPoint}");
+
+                    _ = newClient.StartReadingLoop();
                 }
             }
             catch (Exception ex)
@@ -60,6 +63,17 @@ namespace ChatRoom.Server.Services
             }
             ConnectedClients.Clear();
             _logAction?.Invoke("Server stopped.");
+        }
+
+        public void BroadcastPacket(ChatPacket packet)
+        {
+            foreach (var client in ConnectedClients)
+            {
+                if (client.Username != packet.Username)
+                {
+                    _ = client.SendPacketAsync(packet);
+                }
+            }
         }
     }
 }
