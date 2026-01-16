@@ -7,6 +7,7 @@ using ChatRoom.Client.Services;
 using ChatRoom.Client.Models;
 using Microsoft.Win32;
 using ChatRoom.Core;
+using System.Collections.Generic;
 
 namespace ChatRoom.Client
 {
@@ -15,9 +16,17 @@ namespace ChatRoom.Client
         private ChatService _chatService;
         private string _myUsername;
 
+        private readonly List<string> _emojis = new List<string>
+        {
+            "😀", "😂", "🥰", "😎", "😭", "😡", "👍", "👎", "❤️", "💔",
+            "🎉", "🔥", "💩", "👻", "👀", "👋", "🙏", "💪", "🧠", "💻",
+            "🚀", "🍕", "🍺", "⚽", "🎵", "☀️", "🌈", "⭐", "✅", "❌"
+        };
+
         public MainWindow()
         {
             InitializeComponent();
+
             Random rnd = new Random();
             _myUsername = "User_" + rnd.Next(100, 999);
             this.Title = $"LAN CHAT ROOM - {_myUsername}";
@@ -25,6 +34,45 @@ namespace ChatRoom.Client
             _chatService = new ChatService();
             _chatService.OnLog += HandleLog;
             _chatService.OnMessageReceived += HandleNewMessage;
+
+            InitializeEmojiPicker();
+        }
+
+        private void InitializeEmojiPicker()
+        {
+            foreach (var emoji in _emojis)
+            {
+                Button btn = new Button();
+                btn.Content = emoji;
+                btn.FontSize = 20;
+                btn.Width = 40;
+                btn.Height = 40;
+                btn.Background = Brushes.Transparent;
+                btn.BorderThickness = new Thickness(0);
+                btn.Cursor = Cursors.Hand;
+
+                btn.Click += (s, e) =>
+                {
+                    txtMessage.Text += emoji;
+                    txtMessage.CaretIndex = txtMessage.Text.Length;
+                    txtMessage.Focus();
+                    EmojiPopup.Visibility = Visibility.Collapsed;
+                };
+
+                wpEmojis.Children.Add(btn);
+            }
+        }
+
+        private void btnEmoji_Click(object sender, RoutedEventArgs e)
+        {
+            if (EmojiPopup.Visibility == Visibility.Visible)
+            {
+                EmojiPopup.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                EmojiPopup.Visibility = Visibility.Visible;
+            }
         }
 
         private async void btnConnect_Click(object sender, RoutedEventArgs e)
@@ -62,15 +110,19 @@ namespace ChatRoom.Client
         private async void btnSend_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtMessage.Text)) return;
+
             AddMessage(_myUsername, txtMessage.Text, true);
             await _chatService.SendMessageAsync(txtMessage.Text, _myUsername);
+
             txtMessage.Clear();
             txtMessage.Focus();
+            EmojiPopup.Visibility = Visibility.Collapsed;
         }
 
         private async void btnFile_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "All files (*.*)|*.*";
             if (openFileDialog.ShowDialog() == true)
             {
                 string filePath = openFileDialog.FileName;
@@ -88,14 +140,12 @@ namespace ChatRoom.Client
             if (content.StartsWith("[FILE] "))
             {
                 string fileName = content.Substring(7);
-
                 SaveFileDialog saveDialog = new SaveFileDialog();
                 saveDialog.FileName = fileName;
                 if (saveDialog.ShowDialog() == true)
                 {
                     string folderPath = System.IO.Path.GetDirectoryName(saveDialog.FileName);
                     _chatService.DownloadFolderPath = folderPath;
-
                     AddMessage("System", $"Requesting download: {fileName}...", true);
                     await _chatService.RequestDownloadAsync(fileName);
                 }
@@ -116,8 +166,8 @@ namespace ChatRoom.Client
 
                 lbChat.Items.Add(msg);
                 lbChat.ScrollIntoView(msg);
-
                 lbChat.UpdateLayout();
+
                 var container = lbChat.ItemContainerGenerator.ContainerFromItem(msg) as ListBoxItem;
                 if (container != null && content != null && content.StartsWith("[FILE] "))
                 {
@@ -141,7 +191,6 @@ namespace ChatRoom.Client
 
         private void HandleLog(string msg) { AddMessage("System", msg, false); }
         private void txtMessage_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) btnSend_Click(sender, e); }
-        private void btnEmoji_Click(object sender, RoutedEventArgs e) { txtMessage.Text += "😊"; }
         private void btnHistory_Click(object sender, RoutedEventArgs e) { MessageBox.Show("Coming soon!"); }
     }
 }
