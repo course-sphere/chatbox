@@ -21,13 +21,16 @@
                     <StackPanel>
                         <TextBlock x:Name="SenderName" Text="{Binding Sender}" FontSize="10" Foreground="Gray" Margin="0,0,0,2"/>
                         <TextBlock Text="{Binding Content}" TextWrapping="Wrap" FontSize="14"/>
+
                         <Button x:Name="btnDownload" Content="⬇ Download" Margin="0,5,0,0" 
                                 Background="#4CAF50" Foreground="White" BorderThickness="0" Height="25" FontSize="12"
                                 Visibility="Collapsed" Click="btnDownload_Chat_Click" Tag="{Binding Content}"/>
+
                         <TextBlock Text="{Binding Time, StringFormat=HH:mm}" FontSize="9" Foreground="#888888" HorizontalAlignment="Right" Margin="0,5,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
+
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsMe}" Value="True">
                     <Setter TargetName="MessageBubble" Property="Background" Value="#DCF8C6"/>
@@ -37,6 +40,10 @@
                 <DataTrigger Binding="{Binding IsMe}" Value="False">
                     <Setter TargetName="MessageBubble" Property="Background" Value="White"/>
                     <Setter TargetName="MessageBubble" Property="HorizontalAlignment" Value="Left"/>
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding IsFile}" Value="True">
+                    <Setter TargetName="btnDownload" Property="Visibility" Value="Visible"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
@@ -64,10 +71,28 @@
             </StackPanel>
         </Border>
 
-        <Border Grid.Row="1" Background="#0078D7" Padding="15">
+        <Border Grid.Row="1" Background="#0078D7" Padding="10">
             <Grid>
-                <TextBlock Text="LAN CHAT ROOM" Foreground="White" FontWeight="Bold" FontSize="18" VerticalAlignment="Center"/>
-                <Button x:Name="btnHistory" Content="📅 History" HorizontalAlignment="Right" Background="Transparent" BorderBrush="White" Foreground="White" Click="btnHistory_Click"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="LAN CHAT" Foreground="White" FontWeight="Bold" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                <TextBox x:Name="txtSearch" Grid.Column="1" Margin="5" Padding="5" 
+                         VerticalContentAlignment="Center" TextChanged="txtSearch_TextChanged">
+                    <TextBox.Resources>
+                        <Style TargetType="{x:Type Border}">
+                            <Setter Property="CornerRadius" Value="10"/>
+                        </Style>
+                    </TextBox.Resources>
+                    <TextBox.ToolTip>Search messages...</TextBox.ToolTip>
+                </TextBox>
+
+                <Button x:Name="btnHistory" Grid.Column="2" Content="📅" FontSize="16"  
+                        Background="Transparent" BorderBrush="White" Foreground="White" Click="btnHistory_Click" Margin="5,0,0,0"/>
             </Grid>
         </Border>
 
