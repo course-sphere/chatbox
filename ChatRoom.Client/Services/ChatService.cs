@@ -1,8 +1,8 @@
 ﻿using System;
+using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using ChatRoom.Core; // Bắt buộc có dòng này để dùng ChatPacket
-using System.IO;
+using ChatRoom.Core; // Để dùng ChatPacket
 
 namespace ChatRoom.Client.Services
 {
@@ -11,8 +11,8 @@ namespace ChatRoom.Client.Services
         private TcpClient _client;
         private NetworkStream _stream;
 
-        // Sự kiện bắn log ra ngoài UI
-        public event Action<string>? OnLog;
+        public event Action<string> OnLog;
+        public event Action<ChatPacket> OnMessageReceived;
 
         public ChatService()
         {
@@ -43,24 +43,49 @@ namespace ChatRoom.Client.Services
 
             try
             {
-                var packet = new ChatPacket()
-                {
-                    Type = PacketType.Chat,
-                    Username = username,
-                    Message = content
-                };
-
+                var packet = new ChatPacket(PacketType.Chat, username, content);
                 byte[] data = packet.Serialize();
-
                 byte[] lengthBuffer = BitConverter.GetBytes(data.Length);
                 await _stream.WriteAsync(lengthBuffer, 0, lengthBuffer.Length);
-
                 await _stream.WriteAsync(data, 0, data.Length);
                 await _stream.FlushAsync();
             }
             catch (Exception ex)
             {
-                OnLog?.Invoke($"Error sending message: {ex.Message}");
+                OnLog?.Invoke($"Error sending: {ex.Message}");
+            }
+        }
+
+        public async Task StartReadingLoop()
+        {
+            try
+            {
+                while (_client.Connected)
+                {
+                    byte[] lengthBuffer = new byte[4];
+                    int bytesRead = await _stream.ReadAsync(lengthBuffer, 0, 4);
+                    if (bytesRead == 0) break;
+
+                    int packetLength = BitConverter.ToInt32(lengthBuffer, 0);
+                    if (packetLength > 0)
+                    {
+                        byte[] packetBuffer = new byte[packetLength];
+                        int totalRead = 0;
+                        while (totalRead < packetLength)
+                        {
+                            int read = await _stream.ReadAsync(packetBuffer, totalRead, packetLength - totalRead);
+                            if (read == 0) break;
+                            totalRead += read;
+                        }
+
+                        var packet = ChatPacket.Deserialize(packetBuffer);
+
+                        OnMessageReceived?.Invoke(packet);
+                    }
+                }
+            }
+            catch
+            {
             }
         }
     }
