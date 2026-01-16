@@ -2,7 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media; // QUAN TRỌNG: Thư viện này chứa MediaPlayer để chạy MP3
+using System.Windows.Media;
 using ChatRoom.Client.Services;
 using ChatRoom.Client.Models;
 using Microsoft.Win32;
@@ -152,7 +152,6 @@ namespace ChatRoom.Client
                     catch { }
                 });
             }
-            // ------------------------------------
 
             if (packet.Message != null && packet.Message.StartsWith("[FILE_UPLOADED]|"))
             {

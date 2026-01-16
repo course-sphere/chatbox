@@ -64,14 +64,10 @@ namespace ChatRoom.Server.Services
                                 _server.BroadcastPacket(packet);
                                 break;
 
-                            // --- MỚI THÊM: XỬ LÝ TYPING ---
                             case PacketType.Typing:
-                                // Cập nhật tên nếu có (để đảm bảo danh tính)
                                 if (!string.IsNullOrEmpty(packet.Username)) this.Username = packet.Username;
-                                // Chuyển tiếp ngay cho mọi người biết
                                 _server.BroadcastPacket(packet);
                                 break;
-                            // ------------------------------
 
                             case PacketType.FileHeader:
                                 if (!string.IsNullOrEmpty(packet.Username))
@@ -88,7 +84,7 @@ namespace ChatRoom.Server.Services
                             case PacketType.FileChunk:
                                 if (_activeFileStream != null && packet.Data != null)
                                 {
-                                    if (packet.Data.Length == 0) // Hết file
+                                    if (packet.Data.Length == 0)
                                     {
                                         _activeFileStream.Close();
                                         _activeFileStream = null;
