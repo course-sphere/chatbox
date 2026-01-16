@@ -9,5 +9,7 @@ namespace ChatRoom.Client.Models
         public DateTime Time { get; set; }
         public bool IsMe { get; set; }
         public string? Color { get; set; }
+
+        public bool IsFile { get; set; }
     }
 }

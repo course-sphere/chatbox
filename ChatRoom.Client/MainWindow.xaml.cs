@@ -8,7 +8,8 @@ using ChatRoom.Client.Models;
 using Microsoft.Win32;
 using ChatRoom.Core;
 using System.Collections.Generic;
-using System.Windows.Threading; // QUAN TRỌNG: Để dùng Timer
+using System.Windows.Threading;
+using System.Linq; // Cần cái này để lọc List
 
 namespace ChatRoom.Client
 {
@@ -17,9 +18,11 @@ namespace ChatRoom.Client
         private ChatService _chatService;
         private string _myUsername;
 
+        // Lưu trữ toàn bộ tin nhắn để phục vụ tìm kiếm
+        private List<ChatMessage> _allMessages = new List<ChatMessage>();
+
         private DispatcherTimer _typingTimer;
         private DateTime _lastTypingSent = DateTime.MinValue;
-
 
         private readonly List<string> _emojis = new List<string>
         {
@@ -31,7 +34,6 @@ namespace ChatRoom.Client
         public MainWindow()
         {
             InitializeComponent();
-
             Random rnd = new Random();
             _myUsername = "User_" + rnd.Next(100, 999);
             this.Title = $"LAN CHAT ROOM - {_myUsername}";
@@ -44,11 +46,7 @@ namespace ChatRoom.Client
 
             _typingTimer = new DispatcherTimer();
             _typingTimer.Interval = TimeSpan.FromSeconds(3);
-            _typingTimer.Tick += (s, e) =>
-            {
-                lblTyping.Visibility = Visibility.Collapsed;
-                _typingTimer.Stop();
-            };
+            _typingTimer.Tick += (s, e) => { lblTyping.Visibility = Visibility.Collapsed; _typingTimer.Stop(); };
         }
 
         private async void txtMessage_TextChanged(object sender, TextChangedEventArgs e)
@@ -60,6 +58,31 @@ namespace ChatRoom.Client
             }
         }
 
+        // --- HÀM TÌM KIẾM TIN NHẮN ---
+        private void txtSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string keyword = txtSearch.Text.ToLower();
+
+            // 1. Xóa giao diện hiện tại
+            lbChat.Items.Clear();
+
+            // 2. Lọc tin nhắn từ kho lưu trữ
+            foreach (var msg in _allMessages)
+            {
+                // Nếu từ khóa rỗng (không tìm gì) HOẶC nội dung chứa từ khóa -> Hiện
+                if (string.IsNullOrEmpty(keyword) ||
+                    msg.Content.ToLower().Contains(keyword) ||
+                    msg.Sender.ToLower().Contains(keyword))
+                {
+                    lbChat.Items.Add(msg);
+                }
+            }
+
+            // Cuộn xuống dưới cùng nếu có tin
+            if (lbChat.Items.Count > 0)
+                lbChat.ScrollIntoView(lbChat.Items[lbChat.Items.Count - 1]);
+        }
+
         private void InitializeEmojiPicker()
         {
             foreach (var emoji in _emojis)
@@ -67,30 +90,17 @@ namespace ChatRoom.Client
                 Button btn = new Button();
                 btn.Content = emoji;
                 btn.FontSize = 20;
-                btn.Width = 40;
-                btn.Height = 40;
-                btn.Background = Brushes.Transparent;
-                btn.BorderThickness = new Thickness(0);
+                btn.Width = 40; btn.Height = 40;
+                btn.Background = Brushes.Transparent; btn.BorderThickness = new Thickness(0);
                 btn.Cursor = Cursors.Hand;
-
-                btn.Click += (s, e) =>
-                {
-                    txtMessage.Text += emoji;
-                    txtMessage.CaretIndex = txtMessage.Text.Length;
-                    txtMessage.Focus();
-                    EmojiPopup.Visibility = Visibility.Collapsed;
-                };
-
+                btn.Click += (s, e) => { txtMessage.Text += emoji; txtMessage.CaretIndex = txtMessage.Text.Length; txtMessage.Focus(); EmojiPopup.Visibility = Visibility.Collapsed; };
                 wpEmojis.Children.Add(btn);
             }
         }
 
         private void btnEmoji_Click(object sender, RoutedEventArgs e)
         {
-            if (EmojiPopup.Visibility == Visibility.Visible)
-                EmojiPopup.Visibility = Visibility.Collapsed;
-            else
-                EmojiPopup.Visibility = Visibility.Visible;
+            EmojiPopup.Visibility = (EmojiPopup.Visibility == Visibility.Visible) ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private async void btnConnect_Click(object sender, RoutedEventArgs e)
@@ -120,12 +130,18 @@ namespace ChatRoom.Client
                 {
                     lblTyping.Text = $"{packet.Username} is typing...";
                     lblTyping.Visibility = Visibility.Visible;
-
-                    _typingTimer.Stop();
-                    _typingTimer.Start();
+                    _typingTimer.Stop(); _typingTimer.Start();
                 });
                 return;
             }
+
+            // --- ÂM THANH THÔNG BÁO ---
+            // Nếu tin nhắn không phải của mình -> Kêu "Ting"
+            if (packet.Username != _myUsername)
+            {
+                System.Media.SystemSounds.Exclamation.Play();
+            }
+            // --------------------------
 
             if (packet.Message != null && packet.Message.StartsWith("[FILE_UPLOADED]|"))
             {
@@ -141,13 +157,9 @@ namespace ChatRoom.Client
         private async void btnSend_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtMessage.Text)) return;
-
             AddMessage(_myUsername, txtMessage.Text, true);
             await _chatService.SendMessageAsync(txtMessage.Text, _myUsername);
-
-            txtMessage.Clear();
-            txtMessage.Focus();
-            EmojiPopup.Visibility = Visibility.Collapsed;
+            txtMessage.Clear(); txtMessage.Focus(); EmojiPopup.Visibility = Visibility.Collapsed;
         }
 
         private async void btnFile_Click(object sender, RoutedEventArgs e)
@@ -167,7 +179,6 @@ namespace ChatRoom.Client
         {
             Button btn = (Button)sender;
             string content = (string)btn.Tag;
-
             if (content.StartsWith("[FILE] "))
             {
                 string fileName = content.Substring(7);
@@ -187,39 +198,34 @@ namespace ChatRoom.Client
         {
             Dispatcher.Invoke(() =>
             {
+                // Kiểm tra xem đây có phải là tin nhắn File không (để gán cờ IsFile)
+                bool isFileMsg = content != null && content.StartsWith("[FILE] ");
+
                 var msg = new ChatMessage
                 {
                     Sender = sender ?? "Unknown",
                     Content = content ?? "",
                     Time = DateTime.Now,
-                    IsMe = isMe
+                    IsMe = isMe,
+                    IsFile = isFileMsg // Gán cờ này để XAML tự hiện nút Download
                 };
 
-                lbChat.Items.Add(msg);
-                lbChat.ScrollIntoView(msg);
-                lbChat.UpdateLayout();
+                // 1. Lưu vào kho
+                _allMessages.Add(msg);
 
-                var container = lbChat.ItemContainerGenerator.ContainerFromItem(msg) as ListBoxItem;
-                if (container != null && content != null && content.StartsWith("[FILE] "))
+                // 2. Chỉ hiện lên ListBox nếu khớp với từ khóa tìm kiếm (mặc định là khớp hết)
+                string searchKeyword = txtSearch.Text.ToLower();
+                if (string.IsNullOrEmpty(searchKeyword) ||
+                    msg.Content.ToLower().Contains(searchKeyword) ||
+                    msg.Sender.ToLower().Contains(searchKeyword))
                 {
-                    var btn = FindVisualChild<Button>(container);
-                    if (btn != null) btn.Visibility = Visibility.Visible;
+                    lbChat.Items.Add(msg);
+                    lbChat.ScrollIntoView(msg);
                 }
             });
         }
 
-        private T? FindVisualChild<T>(DependencyObject obj) where T : DependencyObject
-        {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(obj); i++)
-            {
-                var child = VisualTreeHelper.GetChild(obj, i);
-                if (child is T t) return t;
-                var childOfChild = FindVisualChild<T>(child);
-                if (childOfChild != null) return childOfChild;
-            }
-            return null;
-        }
-
+        // Đã xóa hàm FindVisualChild vì giờ dùng Binding xịn rồi
         private void HandleLog(string msg) { AddMessage("System", msg, false); }
         private void txtMessage_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) btnSend_Click(sender, e); }
         private void btnHistory_Click(object sender, RoutedEventArgs e) { MessageBox.Show("Coming soon!"); }
