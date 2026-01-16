@@ -2,14 +2,14 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
+using System.Windows.Media; // QUAN TRỌNG: Thư viện này chứa MediaPlayer để chạy MP3
 using ChatRoom.Client.Services;
 using ChatRoom.Client.Models;
 using Microsoft.Win32;
 using ChatRoom.Core;
 using System.Collections.Generic;
 using System.Windows.Threading;
-using System.Linq; // Cần cái này để lọc List
+using System.Linq;
 
 namespace ChatRoom.Client
 {
@@ -18,11 +18,12 @@ namespace ChatRoom.Client
         private ChatService _chatService;
         private string _myUsername;
 
-        // Lưu trữ toàn bộ tin nhắn để phục vụ tìm kiếm
         private List<ChatMessage> _allMessages = new List<ChatMessage>();
 
         private DispatcherTimer _typingTimer;
         private DateTime _lastTypingSent = DateTime.MinValue;
+
+        private MediaPlayer _mediaPlayer = new MediaPlayer();
 
         private readonly List<string> _emojis = new List<string>
         {
@@ -58,18 +59,14 @@ namespace ChatRoom.Client
             }
         }
 
-        // --- HÀM TÌM KIẾM TIN NHẮN ---
         private void txtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
             string keyword = txtSearch.Text.ToLower();
 
-            // 1. Xóa giao diện hiện tại
             lbChat.Items.Clear();
 
-            // 2. Lọc tin nhắn từ kho lưu trữ
             foreach (var msg in _allMessages)
             {
-                // Nếu từ khóa rỗng (không tìm gì) HOẶC nội dung chứa từ khóa -> Hiện
                 if (string.IsNullOrEmpty(keyword) ||
                     msg.Content.ToLower().Contains(keyword) ||
                     msg.Sender.ToLower().Contains(keyword))
@@ -78,7 +75,6 @@ namespace ChatRoom.Client
                 }
             }
 
-            // Cuộn xuống dưới cùng nếu có tin
             if (lbChat.Items.Count > 0)
                 lbChat.ScrollIntoView(lbChat.Items[lbChat.Items.Count - 1]);
         }
@@ -135,13 +131,28 @@ namespace ChatRoom.Client
                 return;
             }
 
-            // --- ÂM THANH THÔNG BÁO ---
-            // Nếu tin nhắn không phải của mình -> Kêu "Ting"
             if (packet.Username != _myUsername)
             {
-                System.Media.SystemSounds.Exclamation.Play();
+                Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        string soundPath = "noti-sound.mp3";
+
+                        if (System.IO.File.Exists(soundPath))
+                        {
+                            _mediaPlayer.Open(new Uri(soundPath, UriKind.Relative));
+                            _mediaPlayer.Play();
+                        }
+                        else
+                        {
+                            System.Media.SystemSounds.Exclamation.Play();
+                        }
+                    }
+                    catch { }
+                });
             }
-            // --------------------------
+            // ------------------------------------
 
             if (packet.Message != null && packet.Message.StartsWith("[FILE_UPLOADED]|"))
             {
@@ -198,7 +209,6 @@ namespace ChatRoom.Client
         {
             Dispatcher.Invoke(() =>
             {
-                // Kiểm tra xem đây có phải là tin nhắn File không (để gán cờ IsFile)
                 bool isFileMsg = content != null && content.StartsWith("[FILE] ");
 
                 var msg = new ChatMessage
@@ -207,13 +217,11 @@ namespace ChatRoom.Client
                     Content = content ?? "",
                     Time = DateTime.Now,
                     IsMe = isMe,
-                    IsFile = isFileMsg // Gán cờ này để XAML tự hiện nút Download
+                    IsFile = isFileMsg
                 };
 
-                // 1. Lưu vào kho
                 _allMessages.Add(msg);
 
-                // 2. Chỉ hiện lên ListBox nếu khớp với từ khóa tìm kiếm (mặc định là khớp hết)
                 string searchKeyword = txtSearch.Text.ToLower();
                 if (string.IsNullOrEmpty(searchKeyword) ||
                     msg.Content.ToLower().Contains(searchKeyword) ||
@@ -225,7 +233,6 @@ namespace ChatRoom.Client
             });
         }
 
-        // Đã xóa hàm FindVisualChild vì giờ dùng Binding xịn rồi
         private void HandleLog(string msg) { AddMessage("System", msg, false); }
         private void txtMessage_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) btnSend_Click(sender, e); }
         private void btnHistory_Click(object sender, RoutedEventArgs e) { MessageBox.Show("Coming soon!"); }

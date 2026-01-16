@@ -12,4 +12,10 @@
     <ProjectReference Include="..\ChatRoom.Core\ChatRoom.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="noti-sound.mp3">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
