@@ -8,6 +8,7 @@ using ChatRoom.Client.Models;
 using Microsoft.Win32;
 using ChatRoom.Core;
 using System.Collections.Generic;
+using System.Windows.Threading; // QUAN TRỌNG: Để dùng Timer
 
 namespace ChatRoom.Client
 {
@@ -15,6 +16,10 @@ namespace ChatRoom.Client
     {
         private ChatService _chatService;
         private string _myUsername;
+
+        private DispatcherTimer _typingTimer;
+        private DateTime _lastTypingSent = DateTime.MinValue;
+
 
         private readonly List<string> _emojis = new List<string>
         {
@@ -36,6 +41,23 @@ namespace ChatRoom.Client
             _chatService.OnMessageReceived += HandleNewMessage;
 
             InitializeEmojiPicker();
+
+            _typingTimer = new DispatcherTimer();
+            _typingTimer.Interval = TimeSpan.FromSeconds(3);
+            _typingTimer.Tick += (s, e) =>
+            {
+                lblTyping.Visibility = Visibility.Collapsed;
+                _typingTimer.Stop();
+            };
+        }
+
+        private async void txtMessage_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if ((DateTime.Now - _lastTypingSent).TotalSeconds > 2 && !string.IsNullOrEmpty(txtMessage.Text))
+            {
+                _lastTypingSent = DateTime.Now;
+                await _chatService.SendTypingAsync(_myUsername);
+            }
         }
 
         private void InitializeEmojiPicker()
@@ -66,13 +88,9 @@ namespace ChatRoom.Client
         private void btnEmoji_Click(object sender, RoutedEventArgs e)
         {
             if (EmojiPopup.Visibility == Visibility.Visible)
-            {
                 EmojiPopup.Visibility = Visibility.Collapsed;
-            }
             else
-            {
                 EmojiPopup.Visibility = Visibility.Visible;
-            }
         }
 
         private async void btnConnect_Click(object sender, RoutedEventArgs e)
@@ -96,6 +114,19 @@ namespace ChatRoom.Client
 
         private void HandleNewMessage(ChatPacket packet)
         {
+            if (packet.Type == PacketType.Typing)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    lblTyping.Text = $"{packet.Username} is typing...";
+                    lblTyping.Visibility = Visibility.Visible;
+
+                    _typingTimer.Stop();
+                    _typingTimer.Start();
+                });
+                return;
+            }
+
             if (packet.Message != null && packet.Message.StartsWith("[FILE_UPLOADED]|"))
             {
                 string fileName = packet.Message.Split('|')[1];
