@@ -9,35 +9,37 @@ namespace ChatRoom.Core
         Connect,
         Chat,
         Emoji,
-        File,
+        FileHeader,   
+        FileChunk,   
+        FileReq,     
         Disconnect
     }
 
     public class ChatPacket
     {
-        public PacketType Type {  get; set; }
+        public PacketType Type { get; set; }
         public string? Username { get; set; }
         public string? Message { get; set; }
         public byte[]? Data { get; set; }
 
         public ChatPacket() { }
 
-        public ChatPacket(PacketType type, string username, string msg)
+        public ChatPacket(PacketType type, string? username, string? msg, byte[]? data = null)
         {
             Type = type;
             Username = username;
             Message = msg;
+            Data = data;
         }
+
         public byte[] Serialize()
         {
-            string json = JsonSerializer.Serialize(this);
-            return Encoding.UTF8.GetBytes(json);
+            return JsonSerializer.SerializeToUtf8Bytes(this);
         }
 
         public static ChatPacket Deserialize(byte[] data)
         {
-            string json = Encoding.UTF8.GetString(data);
-            return JsonSerializer.Deserialize<ChatPacket>(json)!;
+            return JsonSerializer.Deserialize<ChatPacket>(data)!;
         }
     }
 }

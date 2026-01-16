@@ -2,7 +2,7 @@
 using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using ChatRoom.Core; // Để dùng ChatPacket
+using ChatRoom.Core;
 
 namespace ChatRoom.Client.Services
 {
@@ -13,6 +13,9 @@ namespace ChatRoom.Client.Services
 
         public event Action<string> OnLog;
         public event Action<ChatPacket> OnMessageReceived;
+
+        private FileStream? _downloadStream;
+        public string DownloadFolderPath { get; set; } = "";
 
         public ChatService()
         {
@@ -26,7 +29,6 @@ namespace ChatRoom.Client.Services
                 OnLog?.Invoke($"Connecting to {ip}:{port}...");
                 await _client.ConnectAsync(ip, port);
                 _stream = _client.GetStream();
-
                 OnLog?.Invoke("Connected successfully!");
                 return true;
             }
@@ -39,21 +41,46 @@ namespace ChatRoom.Client.Services
 
         public async Task SendMessageAsync(string content, string username)
         {
-            if (_client == null || !_client.Connected) return;
+            await SendPacketInternalAsync(new ChatPacket(PacketType.Chat, username, content));
+        }
 
+        public async Task UploadFileAsync(string filePath, string username)
+        {
+            string fileName = Path.GetFileName(filePath);
             try
             {
-                var packet = new ChatPacket(PacketType.Chat, username, content);
-                byte[] data = packet.Serialize();
-                byte[] lengthBuffer = BitConverter.GetBytes(data.Length);
-                await _stream.WriteAsync(lengthBuffer, 0, lengthBuffer.Length);
-                await _stream.WriteAsync(data, 0, data.Length);
-                await _stream.FlushAsync();
+                await SendPacketInternalAsync(new ChatPacket(PacketType.FileHeader, username, fileName));
+
+                using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                {
+                    byte[] buffer = new byte[1024 * 20];
+                    int bytesRead;
+                    while ((bytesRead = await fs.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    {
+                        byte[] chunkData = new byte[bytesRead];
+                        Array.Copy(buffer, chunkData, bytesRead);
+                        await SendPacketInternalAsync(new ChatPacket(PacketType.FileChunk, username, fileName, chunkData));
+                    }
+                }
+                await SendPacketInternalAsync(new ChatPacket(PacketType.FileChunk, username, fileName, new byte[0]));
+                OnLog?.Invoke($"Uploaded file: {fileName}");
             }
-            catch (Exception ex)
-            {
-                OnLog?.Invoke($"Error sending: {ex.Message}");
-            }
+            catch (Exception ex) { OnLog?.Invoke($"Upload error: {ex.Message}"); }
+        }
+
+        public async Task RequestDownloadAsync(string fileName)
+        {
+            await SendPacketInternalAsync(new ChatPacket(PacketType.FileReq, "Me", fileName));
+        }
+
+        private async Task SendPacketInternalAsync(ChatPacket packet)
+        {
+            if (_client == null || !_client.Connected) return;
+            byte[] data = packet.Serialize();
+            byte[] lengthBuffer = BitConverter.GetBytes(data.Length);
+            await _stream.WriteAsync(lengthBuffer, 0, lengthBuffer.Length);
+            await _stream.WriteAsync(data, 0, data.Length);
+            await _stream.FlushAsync();
         }
 
         public async Task StartReadingLoop()
@@ -80,13 +107,36 @@ namespace ChatRoom.Client.Services
 
                         var packet = ChatPacket.Deserialize(packetBuffer);
 
-                        OnMessageReceived?.Invoke(packet);
+                        if (packet.Type == PacketType.FileHeader)
+                        {
+                            string savePath = Path.Combine(DownloadFolderPath, packet.Message!);
+                            _downloadStream = new FileStream(savePath, FileMode.Create, FileAccess.Write);
+                            OnLog?.Invoke($"Downloading {packet.Message}...");
+                        }
+                        else if (packet.Type == PacketType.FileChunk)
+                        {
+                            if (_downloadStream != null && packet.Data != null)
+                            {
+                                if (packet.Data.Length == 0)
+                                {
+                                    _downloadStream.Close();
+                                    _downloadStream = null;
+                                    OnLog?.Invoke($"Download finished: {packet.Message}");
+                                }
+                                else
+                                {
+                                    await _downloadStream.WriteAsync(packet.Data, 0, packet.Data.Length);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            OnMessageReceived?.Invoke(packet);
+                        }
                     }
                 }
             }
-            catch
-            {
-            }
+            catch { }
         }
     }
 }
