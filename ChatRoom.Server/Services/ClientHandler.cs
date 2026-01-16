@@ -26,7 +26,7 @@ namespace ChatRoom.Server.Services
             _logAction = logAction;
             _server = server;
             UID = Guid.NewGuid().ToString();
-            Username = "Unknown"; // Mặc định là Unknown
+            Username = "Unknown";
 
             _storagePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ServerFiles");
             if (!Directory.Exists(_storagePath)) Directory.CreateDirectory(_storagePath);
@@ -64,15 +64,20 @@ namespace ChatRoom.Server.Services
                                 _server.BroadcastPacket(packet);
                                 break;
 
+                            // --- MỚI THÊM: XỬ LÝ TYPING ---
+                            case PacketType.Typing:
+                                // Cập nhật tên nếu có (để đảm bảo danh tính)
+                                if (!string.IsNullOrEmpty(packet.Username)) this.Username = packet.Username;
+                                // Chuyển tiếp ngay cho mọi người biết
+                                _server.BroadcastPacket(packet);
+                                break;
+                            // ------------------------------
+
                             case PacketType.FileHeader:
-                                // --- SỬA LỖI Ở ĐÂY ---
-                                // Cập nhật ngay tên người gửi khi bắt đầu nhận file
-                                // Nếu không, Server vẫn tưởng là "Unknown" và chặn tin nhắn
                                 if (!string.IsNullOrEmpty(packet.Username))
                                 {
                                     this.Username = packet.Username;
                                 }
-                                // ---------------------
 
                                 string cleanFileName = Path.GetFileName(packet.Message!);
                                 string savePath = Path.Combine(_storagePath, cleanFileName);
@@ -89,7 +94,6 @@ namespace ChatRoom.Server.Services
                                         _activeFileStream = null;
                                         _logAction?.Invoke($"File saved: {packet.Message}");
 
-                                        // Broadcast thông báo (Lúc này this.Username đã đúng là tên người gửi)
                                         var notiPacket = new ChatPacket(PacketType.Chat, this.Username, $"[FILE_UPLOADED]|{packet.Message}");
                                         _server.BroadcastPacket(notiPacket);
                                     }

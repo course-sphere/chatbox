@@ -12,6 +12,7 @@ namespace ChatRoom.Core
         FileHeader,   
         FileChunk,   
         FileReq,     
+        Typing,
         Disconnect
     }
 

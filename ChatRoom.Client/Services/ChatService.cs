@@ -44,6 +44,14 @@ namespace ChatRoom.Client.Services
             await SendPacketInternalAsync(new ChatPacket(PacketType.Chat, username, content));
         }
 
+        // --- HÀM MỚI: GỬI TÍN HIỆU ĐANG GÕ PHÍM ---
+        public async Task SendTypingAsync(string username)
+        {
+            // Gửi gói tin Typing với nội dung rỗng (không cần thiết)
+            await SendPacketInternalAsync(new ChatPacket(PacketType.Typing, username, ""));
+        }
+        // ------------------------------------------
+
         public async Task UploadFileAsync(string filePath, string username)
         {
             string fileName = Path.GetFileName(filePath);
